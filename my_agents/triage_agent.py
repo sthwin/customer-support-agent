@@ -1,11 +1,20 @@
+import streamlit as st
+from my_agents.account_agent import account_agent
+from my_agents.billing_agent import billing_agent
+from my_agents.order_agent import order_agent
+from my_agents.technical_agent import technical_agent
+
 from agents import (
     Agent,
     RunContextWrapper,
     Runner,
     input_guardrail,
     GuardrailFunctionOutput,
+    handoff,
 )
-from models import UserAccountContext, InputGuardrailOutput
+from agents.extensions.handoff_prompt import RECOMMENDED_PROMPT_PREFIX
+from agents.extensions import handoff_filters
+from models import UserAccountContext, InputGuardrailOutput, HandoffData
 
 input_guardrail_agent = Agent(
     name="Input Guardrail Agent",
@@ -36,11 +45,15 @@ async def off_topic_guardrail(
     )
 
 
+# handofff를 사용하는 에이전트의 프롬프트에는 RECOMMENDED_PROMPT_PREFIX 를 추가하는 것을 권장하고 있음.
 def dynamic_triage_agent_instructions(
     wrapper: RunContextWrapper[UserAccountContext],
     agent: Agent[UserAccountContext],
 ):
     return f"""
+    {RECOMMENDED_PROMPT_PREFIX}
+    
+    
     You are a customer support agent. You ONLY help customers with their questions about their User Account, Billing, Orders, or Technical Support.
     You call customers by their name.
     
@@ -94,10 +107,50 @@ def dynamic_triage_agent_instructions(
     """
 
 
+# on_handoff가 발생할 때 호출됨.
+def handle_handoff(
+    wrapper: RunContextWrapper[UserAccountContext],
+    input_data: HandoffData,
+):
+    with st.sidebar:
+        st.write(
+            f"""
+        Handing off to {input_data.to_agent_name}
+        Reason: {input_data.reason}
+        Issue Type: {input_data.issue_type}
+        Description: {input_data.issue_description}
+        """
+        )
+
+
+#  input_filter는 이전 에이전트에서 있었던 메시지를 모두 받은 후, handoff를 받은 에이전트에게 넘겨줄 메시지 목록만 반환하도록 해줌.
+def make_handoff(agent):
+    return handoff(
+        agent=agent,
+        on_handoff=handle_handoff,
+        input_type=HandoffData,
+        input_filter=handoff_filters.remove_all_tools,
+    )
+
+
 triage_agent = Agent(
     name="Triage Agent",
     instructions=dynamic_triage_agent_instructions,
     input_guardrails=[
         off_topic_guardrail,
+    ],
+    # 에이전트를 툴로 사용하는 방법. 클라이언트는 하나의 에이전트와 커뮤니케이션 하게됨.
+    # handoff 방식은 담당 에이전트에게 전화를 돌려주는 방식과 비슷함. 다른 에이전트로 완전히 전환되는 것임.
+    # tools=[
+    #     technical_agent.as_tool(
+    #         tool_name="technical_support",
+    #         tool_description="Use this when the user needs tech support",
+    #     ),
+    # ],
+    handoffs=[
+        make_handoff(technical_agent),
+        make_handoff(billing_agent),
+        make_handoff(order_agent),
+        make_handoff(account_agent),
     ],
 )
