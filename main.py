@@ -12,8 +12,10 @@ if "session" not in st.session_state:
         session_id="chat-history",
         db_path="customer-support-memory.db",
     )
-
 session: SQLiteSession = st.session_state["session"]
+
+if "agent" not in st.session_state:
+    st.session_state["agent"] = triage_agent
 
 
 async def paint_history():
@@ -35,6 +37,7 @@ asyncio.run(paint_history())
 
 async def run_agent(message: str):
     with st.chat_message("ai"):
+        transferred_agent_message_placeholder = st.empty()
         text_placeholder = st.empty()
         response = ""
 
@@ -42,7 +45,7 @@ async def run_agent(message: str):
 
         try:
             stream = Runner.run_streamed(
-                triage_agent,
+                st.session_state["agent"],
                 message,
                 session=session,
                 context=user_account_ctx,
@@ -52,6 +55,19 @@ async def run_agent(message: str):
                     if event.data.type == "response.output_text.delta":
                         response += event.data.delta
                         text_placeholder.write(response.replace("$", r"\$"))
+
+                elif event.type == "agent_updated_stream_event":
+
+                    if st.session_state["agent"].name != event.new_agent.name:
+                        transferred_agent_message_placeholder.write(
+                            f"🤖 Transferred from {st.session_state['agent'].name} to {event.new_agent.name}"
+                        )
+
+                        st.session_state["agent"] = event.new_agent
+
+                        text_placeholder.empty()
+                        response = ""
+
         except InputGuardrailTripwireTriggered:
             st.write("그 질문은 제가 도와드릴 수 없어요.")
 
