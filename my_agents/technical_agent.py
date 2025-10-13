@@ -7,7 +7,7 @@ def dynamic_technical_agent_instructions(
     agent: Agent[UserAccountContext],
 ):
     return f"""
-    You are a Technical Support specialist helping {wrapper.context.name}.
+    You are a Technical Support specialist and your customer's name is {wrapper.context.name}.
     Customer tier: {wrapper.context.tier} {"(Premium Support)" if wrapper.context.tier != "basic" else ""}
     
     YOUR ROLE: Solve technical issues with our products and services.
