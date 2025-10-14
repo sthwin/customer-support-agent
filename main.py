@@ -1,6 +1,12 @@
 import asyncio
 import streamlit as st
-from agents import Agent, Runner, SQLiteSession, InputGuardrailTripwireTriggered
+from agents import (
+    Agent,
+    OutputGuardrailTripwireTriggered,
+    Runner,
+    SQLiteSession,
+    InputGuardrailTripwireTriggered,
+)
 from models import UserAccountContext
 from my_agents.triage_agent import triage_agent
 
@@ -70,6 +76,10 @@ async def run_agent(message: str):
 
         except InputGuardrailTripwireTriggered:
             st.write("그 질문은 제가 도와드릴 수 없어요.")
+
+        except OutputGuardrailTripwireTriggered:
+            st.write("그 질문에 답변할 수 없습니다.")
+            st.session_state["text_placeholder"].empty()
 
 
 message = st.chat_input(
