@@ -132,7 +132,8 @@ def make_handoff(agent):
         input_filter=handoff_filters.remove_all_tools,
     )
 
-
+# 가드레일과 에이전트는 병렬로 동작함. 가드레일이 끝나지 않아도 에이전트는 시작될 수 있음. 
+# 에이전트마다 output guardrail 각각 만들어 줘야 함. 그래야 관련된 주제외의 답변을 하지 않도록 제한할 수 있음.
 triage_agent = Agent(
     name="Triage Agent",
     instructions=dynamic_triage_agent_instructions,
